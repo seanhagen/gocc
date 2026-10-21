@@ -65,6 +65,8 @@ const lexerSrc string = `
 package lexer
 
 import (
+  "bufio"
+  "bytes"
 {{if .Debug}}	"fmt"
 {{end}}	"os"
 	"unicode/utf8"
@@ -80,22 +82,29 @@ const (
 )
 
 type Lexer struct {
-	src     []byte
+	src     io.RuneReader
 	pos     int
 	line    int
 	column  int
+  size int
 	Context token.Context
 }
 
-func NewLexer(src []byte) *Lexer {
+func newLexer(reader io.RuneReader, size int) *Lexer {
 	lexer := &Lexer{
-		src:     src,
+		src:     reader,
 		pos:     0,
 		line:    1,
 		column:  1,
 		Context: nil,
+    size: size,
 	}
 	return lexer
+
+}
+
+func NewLexer(src []byte) *Lexer {
+  return newLexer(bufio.NewReader(bytes.NewReader(src), len(src)))
 }
 
 // SourceContext is a simple instance of a token.Context which
@@ -109,11 +118,16 @@ func (s *SourceContext) Source() string {
 }
 
 func NewLexerFile(fpath string) (*Lexer, error) {
-	src, err := os.ReadFile(fpath)
+  file, err := os.Open(fpath)
 	if err != nil {
 		return nil, err
 	}
-	lexer := NewLexer(src)
+  fi, err := file.Stat()
+  if err != nil {
+    return nil, err
+  }
+
+	lexer := newLexer(bufio.NewReader(file), fi.Size())
 	lexer.Context = &SourceContext{Filepath: fpath}
 	return lexer, nil
 }
@@ -123,7 +137,7 @@ func (l *Lexer) Scan() (tok *token.Token) {
 	fmt.Printf("Lexer.Scan() pos=%d\n", l.pos)
 	{{- end}}
 	tok = &token.Token{}
-	if l.pos >= len(l.src) {
+	if l.pos >= l.size {
 		tok.Type = token.EOF
 		tok.Pos.Offset, tok.Pos.Line, tok.Pos.Column = l.pos, l.line, l.column
 		tok.Pos.Context = l.Context
@@ -136,9 +150,14 @@ func (l *Lexer) Scan() (tok *token.Token) {
 		{{- if .Debug}}
 		fmt.Printf("\tpos=%d, line=%d, col=%d, state=%d\n", l.pos, l.line, l.column, state)
 		{{- end}}
-		if l.pos >= len(l.src) {
+		if l.pos >= l.size {
 			rune1 = -1
 		} else {
+      rune1, size, err := l.src.ReadRune()
+      if err != nil {
+        fmt.Printf("ReadRune error: %v\n", err)
+        break
+      }
 			rune1, size = utf8.DecodeRune(l.src[l.pos:])
 			l.pos += size
 		}
