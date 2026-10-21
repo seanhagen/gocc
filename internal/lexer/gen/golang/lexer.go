@@ -132,7 +132,7 @@ func NewLexerFile(fpath string) (*Lexer, error) {
 	return lexer, nil
 }
 
-func (l *Lexer) Scan() (tok *token.Token) {
+func (l *Lexer) Scan() (tok *token.Token, err error) {
 	{{- if .Debug}}
 	fmt.Printf("Lexer.Scan() pos=%d\n", l.pos)
 	{{- end}}
@@ -155,10 +155,8 @@ func (l *Lexer) Scan() (tok *token.Token) {
 		} else {
       rune1, size, err := l.src.ReadRune()
       if err != nil {
-        fmt.Printf("ReadRune error: %v\n", err)
-        break
+        return nil, err
       }
-			rune1, size = utf8.DecodeRune(l.src[l.pos:])
 			l.pos += size
 		}
 
@@ -220,7 +218,7 @@ func (l *Lexer) Scan() (tok *token.Token) {
 	fmt.Printf("Token at %s: %s \"%s\"\n", tok.String(), token.TokMap.Id(tok.Type), tok.Lit)
 	{{- end}}
 
-	return
+	return tok, nil
 }
 
 func (l *Lexer) Reset() {

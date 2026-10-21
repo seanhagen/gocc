@@ -156,7 +156,7 @@ type Parser struct {
 }
 
 type Scanner interface {
-	Scan() (tok *token.Token)
+	Scan() (tok *token.Token, err error)
 }
 
 func NewParser() *Parser {
@@ -242,7 +242,12 @@ func (p *Parser) newError(err error) error {
 
 func (p *Parser) Parse(scanner Scanner) (res interface{}, err error) {
 	p.Reset()
-	p.nextToken = scanner.Scan()
+	var err error
+	p.nextToken, err = scanner.Scan()
+	if err != nil {
+		return nil, p.newError(err)
+	}
+
 	for acc := false; !acc; {
 		action := actionTab[p.stack.top()].actions[p.nextToken.Type]
 		if action == nil {
